@@ -1,149 +1,138 @@
-import React,{useEffect, useState} from 'react';
-import { contract } from "@ethersproject/contracts";
-import { abis } from "@my-app/contracts";
-import { ERC20, usecontractFunction, useEthers, useTokenAllowance,useTokenBalance } from "@usedapp/core";
+import React, { useEffect, useState } from 'react';
+import { Contract } from "@ethersproject/contracts";
+// import { abis } from "@my-app/contracts";
+import { ERC20, useContractFunction, useEthers, useTokenAllowance, useTokenBalance } from "@usedapp/core";
 import { ethers } from "ethers";
-import { parseunits } from "ethers/lib/utils";
+import { parseUnits } from "ethers/lib/utils";
 
-import { getAvailableTokens,getCounterpartTokens,findPoolByTokens,isOperationPending,getFailureMessage,getSuccessMessage, getCounterpartTokens } from '../utils';
+import { getAvailableTokens, getCounterpartTokens, findPoolByTokens, isOperationPending, getFailureMessage, getSuccessMessage } from '../utils';
 
 import { ROUTER_ADDRESS } from "../config";
 import { AmountIn, AmountOut, Balance } from './';
 import styles from '../styles';
 
-
-
-
-const Exchange = ({pools}) => {
-  const{account} =useEthers();
-  const[fromValue, setfromValue] = useState("0");
+const Exchange = ({ pools }) => {
+  const { account } = useEthers();
+  const [fromValue, setFromValue] = useState("0");
   const [fromToken, setFromToken] = useState(pools[0].token0Address);
-  const[toToken, settoToken] = useState("");
-  const[resetState, setResetState] = useState(false);
+  const [toToken, setToToken] = useState("");
+  const [resetState, setResetState] = useState(false);
 
-  const fromValueBigNumber = parseunits(fromValue);
+  const fromValueBigNumber = parseUnits(fromValue);
   const availableTokens = getAvailableTokens(pools);
-  const getCounterpartTokens = getCounterpartTokens(pools, fromToken)
-  const pairAddress = findPoolByTokens(pools, fromToken, toToken)?.address  ?? "";
+  const counterpartTokens = getCounterpartTokens(pools, fromToken);
+  const pairAddress = findPoolByTokens(pools, fromToken, toToken)?.address ?? "";
 
-  const routerContract = new contract(ROUTER_ADDRESS, abis.router02);
-  const fromTokenContract = new contract(fromToken,ERC20.abi);
-  const fromTokenBalance = useTokenBalance (fromToken,account);
-  const toTokenBalance = useTokenBalance (toToken,account);
-  const useTokenAllowance = useTokenAllowance(fromToken, account,ROUTER_ADDRESS) ||parseunits("0");
+  // const routerContract = new Contract(ROUTER_ADDRESS, abis.router02);
+  const fromTokenContract = new Contract(fromToken, ERC20.abi);
+  const fromTokenBalance = useTokenBalance(fromToken, account);
+  const toTokenBalance = useTokenBalance(toToken, account);
+  const tokenAllowance = useTokenAllowance(fromToken, account, ROUTER_ADDRESS) || parseUnits("0");
   const approvedNeeded = fromValueBigNumber.gt(tokenAllowance);
-  const fromValueIsGreatThan0 = fromValueBigNumber.gt(parseunits("0"));
-  const hasEnoughBalance = fromValueBigNumber.Ite(fromTokenBalance?? parseunits("0"));
+  const fromValueIsGreaterThan0 = fromValueBigNumber.gt(parseUnits("0"));
+  const hasEnoughBalance = fromValueBigNumber.lte(fromTokenBalance ?? parseUnits("0"));
 
-  const {state: swapApproveState, send: swapApproveSend} = usecontractFunction(fromTokenContract, "approve",{
-    transactionName:"onApproveRequested",
+  const { state: swapApproveState, send: swapApproveSend } = useContractFunction(fromTokenContract, "approve", {
+    transactionName: "onApproveRequested",
     gasLimitBufferPercentage: 10,
   });
 
-  const {state: swapExecuteState, send: swapExecuteSend} = usecontractFunction(routerContract, "swapExactTokensforTokens",{
-    transactionName:"swapExactTokensForTokens",
+  const { state: swapExecuteState, send: swapExecuteSend } = useContractFunction(routerContract, "swapExactTokensForTokens", {
+    transactionName: "swapExactTokensForTokens",
     gasLimitBufferPercentage: 10,
   });
-
 
   const isApproving = isOperationPending(swapApproveState);
-  const isSwapping = isOperationPending('swapExecuteState');
+  const isSwapping = isOperationPending(swapExecuteState);
   const canApprove = !isApproving && approvedNeeded;
-  const canSwap = !approvedNeeded && isSwapping && fromValueIsGreatThan0 && hasEnoughBalance;
+  const canSwap = !approvedNeeded && !isSwapping && fromValueIsGreaterThan0 && hasEnoughBalance;
 
+  const successMessage = getSuccessMessage(swapApproveState, swapExecuteState);
+  const failureMessage = getFailureMessage(swapApproveState, swapExecuteState);
 
-  const successMessage = getSuccessMessage(swapApproveState,swapExecuteState);
-  const failureMessage = getFailureMessage(swapApproveState,swapExecuteState);
+  const onApproveRequested = () => {
+    swapApproveSend(ROUTER_ADDRESS, ethers.constants.MaxUint256);
+  };
 
-  const onApproveRequested =()=>{
-    swapApproveSend(ROUTER_ADDRESS, ethers.constants.MaxUnit256);
-  }
-  const onSwapRequested =() =>{
+  const onSwapRequested = () => {
     swapExecuteSend(
       fromValueBigNumber,
       0,
-      [fromToken,toToken],
+      [fromToken, toToken],
       account,
-      Math.floor(Data.now()/1000)+ 60 * 2
+      Math.floor(Date.now() / 1000) + 60 * 2
     ).then(() => {
-      setfromValue("0");
-    })
-  }
+      setFromValue("0");
+    });
+  };
 
-  const onFromValuechange =(value) =>{
+  const onFromValueChange = (value) => {
     const trimmedValue = value.trim();
 
-    try{
-      if(trimedValue){
-        parseunits(value);
+    try {
+      if (trimmedValue) {
+        parseUnits(value);
 
-        setfromValue(value);
+        setFromValue(value);
       }
-    } catch (error){
+    } catch (error) {}
+  };
 
-    }
-  }
-  const onFromTokenchange = (value) =>{
+  const onFromTokenChange = (value) => {
     setFromToken(value);
-  }
-  const ontoTokenchange = (value) =>{
-    settoToken(value);
-  }
+  };
 
-  useEffect(() =>{
-    if(failureMessage || successMessage){
-      setTimeout(() =>{
+  const onToTokenChange = (value) => {
+    setToToken(value);
+  };
+
+  useEffect(() => {
+    if (failureMessage || successMessage) {
+      setTimeout(() => {
         setResetState(true);
-        setfromValue("0");
-        settoToken("");
-      }, 5000)
+        setFromValue("0");
+        setToToken("");
+      }, 5000);
     }
-  })
-  
-
+  }, [failureMessage, successMessage]);
 
   return (
-    
-    <div className ='flex flex-col w-full items-center'>
+    <div className='flex flex-col w-full items-center'>
       <div className='mb-8'>
-        <AmountIn value={fromValue} onChange = {onfromValueChange} CurrencyValue = {fromToken} onSelect={onFromTokenchange} Currencies ={availableTokens} isSwapping = {isSwapping && hasEnoughBalance}/>
-        <Balance tokenBalance ={fromTokenBalance }/>
+        <AmountIn value={fromValue} onChange={onFromValueChange} CurrencyValue={fromToken} onSelect={onFromTokenChange} Currencies={availableTokens} isSwapping={isSwapping && hasEnoughBalance} />
+        <Balance tokenBalance={fromTokenBalance} />
       </div>
 
       <div className='mb-8 w-[100%]'>
-        <AmountOut fromToken ={fromToken} toToken ={toToken} AmountIn = {fromValueBigNumber} pairContract = {pairAddress} CurrencyValue = {toToken} onSelect={ontoTokenchange} Currencies ={counterpartTokens}/>
-        <Balance tokenBalance = {toTokenBalance}/>
+        <AmountOut fromToken={fromToken} toToken={toToken} AmountIn={fromValueBigNumber} pairContract={pairAddress} CurrencyValue={toToken} onSelect={onToTokenChange} Currencies={counterpartTokens} />
+        <Balance tokenBalance={toTokenBalance} />
       </div>
 
-      {"approvedNeeded" && !isSwapping? (
-        <button disabled={!"canApprove"} onClick = {onApproveRequested}
-         className={
-          '${
-            "canApprove"? "bg-site-pink text-white": "bg-site-dim2 text-site-dim2" 
-          } ${styles.actionButton} '
-          }>
-
+      {approvedNeeded && !isSwapping ? (
+        <button
+          disabled={!canApprove}
+          onClick={onApproveRequested}
+          className={`${canApprove ? "bg-site-pink text-white" : "bg-site-dim2 text-site-dim2"} ${styles.actionButton}`}
+        >
           {isApproving ? "Approving..." : "Approve"}
         </button>
+      ) : (
+        <button
+          disabled={!canSwap}
+          onClick={onSwapRequested}
+          className={`${canSwap ? "bg-site-pink text-white" : "bg-site-dim2 text-site-dim2"} ${styles.actionButton}`}
+        >
+          {isSwapping ? "Swapping..." : hasEnoughBalance ? "Swap" : "Insufficient balance"}
+        </button>
+      )}
 
-      ) : <button disabled={!canSwap} onClick = {onSwapRequested}} className={
-        '${
-          canSwap ? "bg-site-pink text-white": "bg-site-dim2 text-site-dim2" 
-        } ${styles.actionButton} '}>
-        
-      
-     
-        {isSwapping ? "Swapping..." : hasEnoughBalance ? "swap" : "Insufficient balance"}
-      </button>
-      }
-      
       {failureMessage && !resetState ? (
         <p className={styles.message}>{failureMessage}</p>
-      ): successMessage ? (
+      ) : successMessage ? (
         <p className={styles.message}>{successMessage}</p>
-      ) :""}
-    
+      ) : null}
     </div>
-    )
-  }
-export default Exchange
+  );
+};
+
+export default Exchange;

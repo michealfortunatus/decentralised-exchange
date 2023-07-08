@@ -2516,11 +2516,11 @@
   "resolved" "https://registry.npmjs.org/@multiformats/base-x/-/base-x-4.0.1.tgz"
   "version" "4.0.1"
 
-"@my-app/contracts@^1.0.0", "@my-app/contracts@file:C:\\Users\\HP FOLIO\\Documents\\all projects\\dex\\packages\\contracts":
+"@my-app/contracts@^1.0.0", "@my-app/contracts@file:C:\\Users\\HP FOLIO\\Documents\\all projects\\decentralised exchange\\packages\\contracts":
   "resolved" "file:packages/contracts"
   "version" "1.0.0"
 
-"@my-app/react-app@file:C:\\Users\\HP FOLIO\\Documents\\all projects\\dex\\packages\\react-app":
+"@my-app/react-app@file:C:\\Users\\HP FOLIO\\Documents\\all projects\\decentralised exchange\\packages\\react-app":
   "resolved" "file:packages/react-app"
   "version" "1.0.0"
   dependencies:
